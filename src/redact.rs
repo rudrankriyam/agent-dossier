@@ -92,7 +92,7 @@ pub fn redact_text(input: &str) -> String {
 /// Returns a printable path without revealing the current user's home
 /// directory or allowing terminal escape sequences through.
 pub fn safe_display_path(path: impl AsRef<Path>) -> String {
-    redact_text(&path.as_ref().to_string_lossy())
+    redact_text(&path.as_ref().to_string_lossy()).replace('\\', "/")
 }
 
 fn regex<'a>(slot: &'a OnceLock<Regex>, pattern: &str) -> &'a Regex {
@@ -183,7 +183,11 @@ mod tests {
         // Assemble scanner-shaped fixtures at runtime so repository secret
         // scanners do not mistake synthetic test data for a live credential.
         let jwt = [
-            "ey", "JhbGciOiJIUzI1NiJ9.", "ey", "JzdWIiOiIxMjM0NTY3ODkwIn0.", "signature123",
+            "ey",
+            "JhbGciOiJIUzI1NiJ9.",
+            "ey",
+            "JzdWIiOiIxMjM0NTY3ODkwIn0.",
+            "signature123",
         ]
         .concat();
         let redacted = redact_text(&format!("session={jwt}"));
