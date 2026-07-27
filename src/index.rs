@@ -495,8 +495,7 @@ fn kind_name(kind: EventKind) -> &'static str {
 fn repo_name(cwd: &str) -> Option<String> {
     cwd.replace('\\', "/")
         .split('/')
-        .filter(|part| !part.is_empty() && *part != "~")
-        .next_back()
+        .rfind(|part| !part.is_empty() && *part != "~")
         .map(str::to_string)
 }
 
