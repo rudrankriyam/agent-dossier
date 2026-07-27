@@ -1,0 +1,3 @@
+{"timestamp":"2026-04-17T19:59:11.000Z","type":"session_meta","payload":{"id":"fork-legacy","forked_from_id":"root-legacy","timestamp":"2026-04-17T19:59:11.000Z","cwd":"/tmp/legacy","originator":"Codex Desktop","cli_version":"0.120.0","source":"vscode","model_provider":"openai"}}
+{"timestamp":"2026-04-17T20:00:00.000Z","type":"turn_context","payload":{"cwd":"/tmp/legacy","approval_policy":"never","model":"gpt-legacy","effort":"medium","summary":"auto"}}
+{"timestamp":"2026-04-17T20:00:01.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Still working.","phase":"commentary"}}
