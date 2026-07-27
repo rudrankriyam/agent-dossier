@@ -259,6 +259,9 @@ mod tests {
     fn elides_home_paths() {
         let home = dirs::home_dir().expect("test requires a home directory");
         let nested = home.join("Documents").join("private-project");
+        let native_elided = std::path::PathBuf::from("~")
+            .join("Documents")
+            .join("private-project");
 
         assert_eq!(
             safe_display_path(&nested),
@@ -266,7 +269,7 @@ mod tests {
         );
         assert_eq!(
             redact_text(&nested.to_string_lossy()),
-            "~/Documents/private-project"
+            native_elided.to_string_lossy()
         );
     }
 
