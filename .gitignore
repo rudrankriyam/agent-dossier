@@ -1,6 +1,16 @@
-/target
-/.data
+/target/
+/.data/
+
+# Local Agent Dossier indexes and SQLite sidecars
 *.sqlite
-*.sqlite-shm
+*.sqlite3
 *.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Local environment and OS files
+.env
+.env.*
+!.env.example
 .DS_Store
