@@ -31,6 +31,13 @@ $ agent-dossier dossier "Why was the release paused?"
 The dossier is cited evidence for Codex or a human to reason over. It is not a
 generated answer.
 
+## Benchmark
+
+The current blinded result is 4/10 strict passes for Codex with Agent Dossier
+versus 6/10 for native Codex, with a 4.67x median speedup and 94% fewer input
+tokens. See [the benchmark methodology and full aggregate
+table](docs/benchmark.md).
+
 ## Development
 
 ```bash
