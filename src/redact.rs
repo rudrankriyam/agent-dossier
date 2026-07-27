@@ -26,7 +26,7 @@ pub fn redact_text(input: &str) -> String {
 
     text = regex(
         &AUTHORIZATION,
-        r"\b((?:Bearer|bearer|BEARER)[ \t]+[A-Za-z0-9._~+/\-=]{4,}|(?:Basic|basic|BASIC)[ \t]+[A-Za-z0-9+/]{4,}={0,2})",
+        r"(?-u:\b)((?:Bearer|bearer|BEARER)[ \t]+[A-Za-z0-9._~+/=-]{4,}|(?:Basic|basic|BASIC)[ \t]+[A-Za-z0-9+/]{4,}={0,2})",
     )
     .replace_all(&text, |captures: &regex::Captures<'_>| {
         if captures[1].to_ascii_lowercase().starts_with("basic") {
@@ -39,14 +39,14 @@ pub fn redact_text(input: &str) -> String {
 
     text = regex(
         &JWT,
-        r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b",
+        r"(?-u:\b)eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}(?-u:\b)",
     )
     .replace_all(&text, "[REDACTED:JWT]")
     .into_owned();
 
     text = regex(
         &KNOWN_TOKEN,
-        r"(?x)\b(?:
+        r"(?x)(?-u:\b)(?:
             sk-(?:proj-)?[A-Za-z0-9_-]{8,}
             | github_pat_[A-Za-z0-9_]{8,}
             | gh[pousr]_[A-Za-z0-9]{8,}
@@ -54,7 +54,7 @@ pub fn redact_text(input: &str) -> String {
             | npm_[A-Za-z0-9]{8,}
             | AIza[A-Za-z0-9_-]{12,}
             | AKIA[0-9A-Z]{16}
-        )\b",
+        )(?-u:\b)",
     )
     .replace_all(&text, "[REDACTED:TOKEN]")
     .into_owned();
@@ -70,7 +70,7 @@ pub fn redact_text(input: &str) -> String {
 
     text = regex(
         &DOTENV_SECRET,
-        r#"(?m)^([ \t]*(?:(?:export|EXPORT)[ \t]+)?[A-Za-z][A-Za-z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_?KEY|CLIENT_?SECRET|AUTHORIZATION|COOKIE|api_?key|token|secret|password|passwd|private_?key|client_?secret|authorization|cookie)[A-Za-z0-9_]*[ \t]*=[ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s#\r\n]+)"#,
+        r#"(?m)^([ \t]*(?:(?:export|EXPORT)[ \t]+)?[A-Za-z][A-Za-z0-9_]*(?:API_?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_?KEY|CLIENT_?SECRET|AUTHORIZATION|COOKIE|api_?key|token|secret|password|passwd|private_?key|client_?secret|authorization|cookie)[A-Za-z0-9_]*[ \t]*=[ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\x20\t#\r\n]+)"#,
     )
     .replace_all(&text, |captures: &regex::Captures<'_>| {
         format!("{}{REDACTED_SECRET}", &captures[1])
@@ -79,7 +79,7 @@ pub fn redact_text(input: &str) -> String {
 
     text = regex(
         &LABELED_SECRET,
-        r#"\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|client[_-]?secret|password|passwd|private[_-]?key|authorization|cookie|API[_-]?KEY|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|TOKEN|SECRET|CLIENT[_-]?SECRET|PASSWORD|PASSWD|PRIVATE[_-]?KEY|AUTHORIZATION|COOKIE)[ \t]*[:=][ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;\r\n]+)"#,
+        r#"(?-u:\b)((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|client[_-]?secret|password|passwd|private[_-]?key|authorization|cookie|API[_-]?KEY|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|TOKEN|SECRET|CLIENT[_-]?SECRET|PASSWORD|PASSWD|PRIVATE[_-]?KEY|AUTHORIZATION|COOKIE)[ \t]*[:=][ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\x20\t,;\r\n]+)"#,
     )
     .replace_all(&text, |captures: &regex::Captures<'_>| {
         format!("{}{REDACTED_SECRET}", &captures[1])
