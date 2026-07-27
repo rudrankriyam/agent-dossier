@@ -1,0 +1,16 @@
+[package]
+name = "agent-dossier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+description = "A local evidence compiler for Codex history"
+license = "MIT"
+repository = "https://github.com/rudrankriyam/agent-dossier"
+keywords = ["codex", "cli", "history", "provenance", "sqlite"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "agent-dossier"
+path = "src/main.rs"
+
+[dependencies]
