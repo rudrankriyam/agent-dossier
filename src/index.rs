@@ -15,7 +15,7 @@ use crate::model::{EventKind, Role};
 use crate::redact::redact_text;
 
 const APPLICATION_ID: i64 = 0x4144_4f53; // ADOS
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct IndexStats {
@@ -84,7 +84,17 @@ impl CodexIndex {
             );
         }
         if user_version != 0 && user_version != SCHEMA_VERSION {
-            bail!("unsupported Agent Dossier index schema {user_version}");
+            // The index is a derived cache over local JSONL, so an outdated
+            // schema is wiped and rebuilt on the next refresh instead of
+            // stranding the user behind an error.
+            connection.execute_batch(
+                "
+                DROP TABLE IF EXISTS event_fts;
+                DROP TABLE IF EXISTS events;
+                DROP TABLE IF EXISTS sessions;
+                DROP TABLE IF EXISTS files;
+                ",
+            )?;
         }
 
         connection.execute_batch(
@@ -143,7 +153,7 @@ impl CodexIndex {
                 session_id UNINDEXED,
                 tokenize='porter unicode61'
             );
-            PRAGMA user_version = 1;
+            PRAGMA user_version = 2;
             ",
         )?;
 
@@ -271,10 +281,16 @@ impl CodexIndex {
                     ],
                 )?;
                 let event_id = transaction.last_insert_rowid();
-                let (user, assistant, tool, metadata) = match event.role {
-                    Role::User => (text.as_str(), "", "", ""),
-                    Role::Assistant => ("", text.as_str(), "", ""),
-                    Role::Tool => ("", "", text.as_str(), ""),
+                // Replayed `response_item` messages carry the user role on the
+                // wire but are injected context (transcripts, instructions),
+                // not the person typing. Indexing them as user text lets
+                // keyword-stuffed boilerplate dominate ranking, so they index
+                // as metadata instead.
+                let (user, assistant, tool, metadata) = match (event.role, event.kind) {
+                    (Role::User, EventKind::ResponseMessage) => ("", "", "", text.as_str()),
+                    (Role::User, _) => (text.as_str(), "", "", ""),
+                    (Role::Assistant, _) => ("", text.as_str(), "", ""),
+                    (Role::Tool, _) => ("", "", text.as_str(), ""),
                     _ => ("", "", "", text.as_str()),
                 };
                 transaction.execute(
