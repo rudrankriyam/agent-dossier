@@ -46,6 +46,15 @@ impl RepoHint {
     }
 }
 
+/// Normalizes a repository name for identity comparison.
+///
+/// Checkout directory names and spoken repository names disagree on case and
+/// on `_` versus `-` far more often than they disagree on anything else, so
+/// both collapse to one key before comparison.
+pub fn repo_key(value: &str) -> String {
+    value.to_ascii_lowercase().replace('_', "-")
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QueryAnalysis {
     /// The bounded input used for all analysis.
