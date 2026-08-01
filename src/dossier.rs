@@ -171,17 +171,22 @@ impl CodexIndex {
     /// Repository hints become a hard filter only when they match indexed
     /// sessions; otherwise retrieval falls back to the unrestricted search so
     /// a mistyped or unindexed name cannot silently empty the dossier.
+    ///
+    /// Beyond explicit `owner/name` and "repository X" phrasing, a bare
+    /// project name such as "AuralKit" also arms the scope when it matches an
+    /// indexed checkout name, because that is how people actually ask.
     fn repo_scope(&self, analysis: &QueryAnalysis) -> Result<Option<Vec<String>>> {
-        if analysis.repos.is_empty() {
-            return Ok(None);
-        }
         let mut keys: Vec<String> = analysis
             .repos
             .iter()
             .map(|hint| repo_key(&hint.name))
             .collect();
+        keys.extend(self.vocabulary_repo_hints(analysis)?);
         keys.sort();
         keys.dedup();
+        if keys.is_empty() {
+            return Ok(None);
+        }
 
         let placeholders = (1..=keys.len())
             .map(|position| format!("?{position}"))
@@ -196,6 +201,43 @@ impl CodexIndex {
             |row| row.get(0),
         )?;
         Ok((matches > 0).then_some(keys))
+    }
+
+    /// Finds indexed repository names mentioned bare in the query.
+    ///
+    /// Single tokens must clear a generic-word blocklist so a repository named
+    /// `release` cannot hijack every question about releases; joined windows
+    /// (for CamelCase and hyphenated checkout names split by tokenization) are
+    /// specific enough on their own.
+    fn vocabulary_repo_hints(&self, analysis: &QueryAnalysis) -> Result<Vec<String>> {
+        let mut statement = self.connection().prepare(
+            "SELECT DISTINCT replace(lower(repo), '_', '-') FROM sessions WHERE repo IS NOT NULL",
+        )?;
+        let known: HashSet<String> = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        if known.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let tokens: Vec<&str> = analysis.normalized.split_whitespace().collect();
+        let mut hints = Vec::new();
+        for (index, token) in tokens.iter().enumerate() {
+            if token.len() >= 4 && !is_generic_repo_word(token) && known.contains(*token) {
+                hints.push((*token).to_string());
+            }
+            for window in 2..=3 {
+                let Some(parts) = tokens.get(index..index + window) else {
+                    continue;
+                };
+                for joined in [parts.join(""), parts.join("-")] {
+                    if joined.len() >= 5 && known.contains(joined.as_str()) {
+                        hints.push(joined);
+                    }
+                }
+            }
+        }
+        Ok(hints)
     }
 
     fn search_candidates(
@@ -234,28 +276,27 @@ impl CodexIndex {
             LIMIT {limit_placeholder}
             "
         ))?;
-        let rows =
-            statement.query_map(rusqlite::params_from_iter(parameters), |row| {
-                let rank: f64 = row.get(15)?;
-                Ok(Candidate {
-                    event_id: row.get(0)?,
-                    session_id: row.get(1)?,
-                    root_id: row.get(2)?,
-                    repo: row.get(3)?,
-                    provenance_status: row.get(4)?,
-                    seq: row.get(5)?,
-                    line: row.get::<_, i64>(6)? as u64,
-                    byte_offset: row.get::<_, i64>(7)? as u64,
-                    timestamp: row.get(8)?,
-                    turn_id: row.get(9)?,
-                    role: row.get(10)?,
-                    kind: row.get(11)?,
-                    text: row.get(12)?,
-                    source_path: row.get(13)?,
-                    content_hash: row.get(14)?,
-                    score: (-rank * 1_000_000.0).round() as i64,
-                })
-            })?;
+        let rows = statement.query_map(rusqlite::params_from_iter(parameters), |row| {
+            let rank: f64 = row.get(15)?;
+            Ok(Candidate {
+                event_id: row.get(0)?,
+                session_id: row.get(1)?,
+                root_id: row.get(2)?,
+                repo: row.get(3)?,
+                provenance_status: row.get(4)?,
+                seq: row.get(5)?,
+                line: row.get::<_, i64>(6)? as u64,
+                byte_offset: row.get::<_, i64>(7)? as u64,
+                timestamp: row.get(8)?,
+                turn_id: row.get(9)?,
+                role: row.get(10)?,
+                kind: row.get(11)?,
+                text: row.get(12)?,
+                source_path: row.get(13)?,
+                content_hash: row.get(14)?,
+                score: (-rank * 1_000_000.0).round() as i64,
+            })
+        })?;
         let mut candidates: Vec<Candidate> = rows.collect::<rusqlite::Result<_>>()?;
         for candidate in &mut candidates {
             candidate.score += structured_boost(candidate, analysis);
@@ -342,6 +383,62 @@ fn structured_boost(candidate: &Candidate, analysis: &QueryAnalysis) -> i64 {
             Intent::Chronology if candidate.timestamp.is_some() => 700_000,
             _ => 0,
         }
+}
+
+/// Words that are too generic to identify a repository on their own, even
+/// when a checkout with that exact name exists.
+fn is_generic_repo_word(token: &str) -> bool {
+    matches!(
+        token,
+        "agent"
+            | "agents"
+            | "android"
+            | "api"
+            | "apis"
+            | "app"
+            | "apps"
+            | "backend"
+            | "build"
+            | "builds"
+            | "client"
+            | "code"
+            | "codex"
+            | "config"
+            | "data"
+            | "demo"
+            | "deploy"
+            | "docs"
+            | "frontend"
+            | "history"
+            | "index"
+            | "main"
+            | "master"
+            | "memory"
+            | "mobile"
+            | "model"
+            | "models"
+            | "notes"
+            | "packages"
+            | "project"
+            | "projects"
+            | "release"
+            | "releases"
+            | "scripts"
+            | "search"
+            | "server"
+            | "site"
+            | "swift"
+            | "test"
+            | "testing"
+            | "tests"
+            | "tools"
+            | "update"
+            | "upload"
+            | "version"
+            | "website"
+            | "work"
+            | "workspace"
+    )
 }
 
 /// Finds `needle` in `text` where the surrounding characters keep the match a
