@@ -260,7 +260,7 @@ fn outdated_index_schema_is_wiped_and_rebuilt() {
     let database = temp.path().join("index.sqlite");
     {
         let mut index = CodexIndex::open(&database).unwrap();
-        index.refresh(&[sources.clone()]).unwrap();
+        index.refresh(std::slice::from_ref(&sources)).unwrap();
     }
     {
         let connection = rusqlite::Connection::open(&database).unwrap();
