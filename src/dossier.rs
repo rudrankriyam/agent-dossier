@@ -206,9 +206,10 @@ impl CodexIndex {
     /// Finds indexed repository names mentioned bare in the query.
     ///
     /// Single tokens must clear a generic-word blocklist so a repository named
-    /// `release` cannot hijack every question about releases; joined windows
-    /// (for CamelCase and hyphenated checkout names split by tokenization) are
-    /// specific enough on their own.
+    /// `release` cannot hijack every question about releases. Joined windows
+    /// rebuild CamelCase and hyphenated checkout names split by tokenization,
+    /// so they count only when the query wrote those words joined; ordinary
+    /// phrasing like "release checklist" never scopes to `release-checklist`.
     fn vocabulary_repo_hints(&self, analysis: &QueryAnalysis) -> Result<Vec<String>> {
         let mut statement = self.connection().prepare(
             "SELECT DISTINCT replace(lower(repo), '_', '-') FROM sessions WHERE repo IS NOT NULL",
@@ -221,6 +222,7 @@ impl CodexIndex {
         }
 
         let tokens: Vec<&str> = analysis.normalized.split_whitespace().collect();
+        let written = repo_key(&analysis.query).replace('-', "");
         let mut hints = Vec::new();
         for (index, token) in tokens.iter().enumerate() {
             if token.len() >= 4 && !is_generic_repo_word(token) && known.contains(*token) {
@@ -230,7 +232,11 @@ impl CodexIndex {
                 let Some(parts) = tokens.get(index..index + window) else {
                     continue;
                 };
-                for joined in [parts.join(""), parts.join("-")] {
+                let compact = parts.join("");
+                if !written.contains(compact.as_str()) {
+                    continue;
+                }
+                for joined in [compact.clone(), parts.join("-")] {
                     if joined.len() >= 5 && known.contains(joined.as_str()) {
                         hints.push(joined);
                     }

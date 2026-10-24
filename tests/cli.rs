@@ -69,6 +69,28 @@ fn indexes_and_queries_synthetic_codex_history() {
 }
 
 #[test]
+fn dossier_on_an_outdated_index_asks_for_a_reindex() {
+    let temp = TempDir::new().unwrap();
+    let database = temp.path().join("index.sqlite");
+    let database_text = database.to_str().unwrap();
+    assert!(
+        run(&["index", "--source", fixture_root(), "--db", database_text])
+            .status
+            .success()
+    );
+    rusqlite::Connection::open(&database)
+        .unwrap()
+        .pragma_update(None, "user_version", 1)
+        .unwrap();
+
+    for _ in 0..2 {
+        let dossier = run(&["dossier", "What command passed?", "--db", database_text]);
+        assert!(!dossier.status.success());
+        assert!(String::from_utf8_lossy(&dossier.stderr).contains("run `agent-dossier index`"));
+    }
+}
+
+#[test]
 fn second_index_run_is_incremental() {
     let temp = TempDir::new().unwrap();
     let database = temp.path().join("index.sqlite");

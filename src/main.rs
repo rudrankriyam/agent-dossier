@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use agent_dossier::dossier::DossierRequest;
 use agent_dossier::index::{default_codex_sources, default_index_path};
 use agent_dossier::{CodexIndex, render_markdown};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
@@ -115,6 +115,14 @@ fn run() -> Result<()> {
         } => {
             let db = db.unwrap_or(default_index_path()?);
             let index = CodexIndex::open(&db)?;
+            // An index from an older version is cleared on open, so an empty
+            // result here would look like no history at all.
+            if index.is_empty()? {
+                bail!(
+                    "no sessions indexed at {}; run `agent-dossier index` first",
+                    db.display()
+                );
+            }
             let mut request = DossierRequest::new(query);
             request.max_sessions = sessions;
             request.max_evidence = evidence;

@@ -177,6 +177,48 @@ fn bare_project_name_scopes_retrieval_to_that_repository() {
 }
 
 #[test]
+fn separately_written_words_do_not_arm_a_hyphenated_repository_scope() {
+    let temp = TempDir::new().unwrap();
+    let sources = temp.path().join("sessions");
+    fs::create_dir_all(&sources).unwrap();
+    write_session(
+        &sources,
+        "checklist.jsonl",
+        "session-checklist",
+        "/tmp/checkout/release-checklist",
+        &["The release checklist gained a signing step."],
+    );
+    write_session(
+        &sources,
+        "app.jsonl",
+        "session-app",
+        "/tmp/checkout/some-app",
+        &["We walked the release checklist before shipping the app."],
+    );
+    let mut index = CodexIndex::open(temp.path().join("index.sqlite")).unwrap();
+    index.refresh(&[sources]).unwrap();
+
+    let phrased = index
+        .dossier(DossierRequest::new("What is on the release checklist?"))
+        .unwrap();
+    assert!(
+        phrased
+            .evidence
+            .iter()
+            .any(|item| item.session_id == "session-app"),
+        "ordinary phrasing scoped retrieval to release-checklist"
+    );
+
+    let named = index
+        .dossier(DossierRequest::new("What changed in ReleaseChecklist?"))
+        .unwrap();
+    assert!(!named.evidence.is_empty());
+    for item in &named.evidence {
+        assert_eq!(item.session_id, "session-checklist");
+    }
+}
+
+#[test]
 fn generic_words_do_not_arm_the_repository_scope() {
     let temp = TempDir::new().unwrap();
     let sources = temp.path().join("sessions");

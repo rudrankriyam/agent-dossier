@@ -334,6 +334,13 @@ impl CodexIndex {
         Ok(stats)
     }
 
+    pub fn is_empty(&self) -> Result<bool> {
+        let sessions: i64 =
+            self.connection
+                .query_row("SELECT count(*) FROM sessions", [], |row| row.get(0))?;
+        Ok(sessions == 0)
+    }
+
     pub(crate) fn connection(&self) -> &Connection {
         &self.connection
     }
